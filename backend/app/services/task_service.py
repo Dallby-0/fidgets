@@ -15,21 +15,53 @@ class TaskService:
     
     def create_task(self, db: Session, user_id: str, task_data: TaskCreate) -> TaskDB:
         """创建任务并启动执行"""
+        # 使用默认模型路径（如果未提供）
+        model_name = task_data.model_name or settings.default_model_path
+        logger.info(f"[训练任务] 使用模型路径: {model_name}")
+        
         # 生成输出目录
         if not task_data.output_dir:
             task_id = str(uuid.uuid4())
             output_dir = f"{settings.remote_user_data_dir}/{user_id}/models/{task_id}"
         else:
             output_dir = task_data.output_dir
+        logger.info(f"[训练任务] 使用输出目录: {output_dir}")
+
+        # 在远程服务器上准备当前数据集文件：复制为 current_dataset.json
+        current_dataset_path = f"{settings.remote_work_dir}/current_dataset.json"
+        copy_command = f"cp {task_data.dataset_path} {current_dataset_path}"
+        logger.info(f"[训练任务] 准备数据集：{task_data.dataset_path} -> {current_dataset_path}")
+        try:
+            stdout_cp, stderr_cp, rc_cp = self.ssh_service.execute_command(copy_command, background=False)
+            logger.info(f"[训练任务] 拷贝数据集返回码: {rc_cp}")
+            logger.info(f"[训练任务] 拷贝数据集 stdout: {stdout_cp[:500] if stdout_cp else '(空)'}")
+            logger.info(f"[训练任务] 拷贝数据集 stderr: {stderr_cp[:500] if stderr_cp else '(空)'}")
+            if rc_cp != 0:
+                raise Exception(f"远程拷贝数据集失败: {stderr_cp}")
+        except Exception as e:
+            logger.error(f"[训练任务] 远程拷贝数据集失败: {str(e)}", exc_info=True)
+            raise
+
+        # 确保输出目录存在（在构建命令之前）
+        mkdir_command = f"mkdir -p {output_dir}"
+        logger.info(f"[训练任务] 创建输出目录: {output_dir}")
+        try:
+            stdout_mkdir, stderr_mkdir, rc_mkdir = self.ssh_service.execute_command(mkdir_command, background=False)
+            if rc_mkdir != 0:
+                logger.warning(f"[训练任务] 创建输出目录失败: {stderr_mkdir}")
+                raise Exception(f"创建输出目录失败: {stderr_mkdir}")
+        except Exception as e:
+            logger.error(f"[训练任务] 创建输出目录失败: {str(e)}", exc_info=True)
+            raise
         
-        # 构建训练命令
-        command = self.build_training_command(task_data, output_dir)
+        # 构建训练命令（此时 --dataset 将固定使用 current_dataset）
+        command = self.build_training_command(task_data, output_dir, model_name)
         
         # 创建任务记录
         db_task = TaskDB(
             user_id=user_id,
             name=task_data.name,
-            model_name=task_data.model_name,
+            model_name=model_name,  # 使用处理后的模型路径（默认值或用户提供的值）
             dataset_path=task_data.dataset_path,
             epochs=task_data.epochs,
             learning_rate=task_data.learning_rate,
@@ -67,28 +99,65 @@ class TaskService:
         
         return db_task
     
-    def build_training_command(self, task_data: TaskCreate, output_dir: str) -> str:
-        """构建 LlamaFactory 训练命令"""
+    def build_training_command(self, task_data: TaskCreate, output_dir: str, model_name: str) -> str:
+        """构建 LlamaFactory 训练命令
+
+        目标命令示例（用户在云端测试通过的版本）：
+
+        llamafactory-cli train \
+          --stage sft \
+          --model_name_or_path /root/autodl-tmp/Qwen2-0.5B-Instruct \
+          --dataset current_dataset \
+          --template qwen2 \
+          --finetuning_type lora \
+          --output_dir /root/autodl-tmp/out \
+          --overwrite_cache \
+          --per_device_train_batch_size 4 \
+          --gradient_accumulation_steps 4 \
+          --learning_rate 5e-5 \
+          --num_train_epochs 3.0 \
+          --fp16 \
+          --plot_loss \
+          --do_train
+        """
         work_dir = settings.remote_work_dir
-        command = f"""cd {work_dir} && nohup llamafactory-cli train \
-    --model_name_or_path {task_data.model_name} \
-    --dataset {task_data.dataset_path} \
-    --template default \
-    --finetuning_type lora \
-    --output_dir {output_dir} \
-    --num_train_epochs {task_data.epochs} \
-    --learning_rate {task_data.learning_rate} \
-    --per_device_train_batch_size {task_data.batch_size} \
-    --cutoff_len 1024 \
-    --plot_loss > {output_dir}/train.log 2>&1 &"""
+        dataset_name = "current_dataset"
+
+        # 构建命令字符串
+        # 使用 bash -l -c 确保使用login shell并加载环境变量（如.bashrc中的PATH）
+        # 将多行命令合并为单行，避免SSH解析问题
+        # 注意：使用双引号包裹bash -c的参数，避免单引号冲突
+        train_cmd = (
+            f"cd {work_dir} && "
+            f"nohup llamafactory-cli train "
+            f"--stage {task_data.stage or 'sft'} "
+            f"--model_name_or_path {model_name} "
+            f"--dataset {dataset_name} "
+            f"--template {task_data.template or 'qwen2'} "
+            f"--finetuning_type lora "
+            f"--output_dir {output_dir} "
+            f"--overwrite_cache "
+            f"--per_device_train_batch_size {task_data.batch_size or 4} "
+            f"--gradient_accumulation_steps {task_data.gradient_accumulation_steps or 4} "
+            f"--learning_rate {task_data.learning_rate or 5e-5} "
+            f"--num_train_epochs {task_data.epochs or 3.0} "
+            f"--fp16 "
+            f"--cutoff_len 1024 "
+            f"--plot_loss "
+            f"--do_train > {output_dir}/train.log 2>&1 &"
+        )
         
+        # 使用 bash -l -c 执行（-l表示login shell，会加载.bashrc等配置文件）
+        # 使用双引号包裹命令，避免单引号冲突
+        command = f'bash -l -c "{train_cmd}"'
+
         logger.info(f"[训练任务] 构建训练命令:")
         logger.info(f"[训练任务] 工作目录: {work_dir}")
-        logger.info(f"[训练任务] 模型: {task_data.model_name}")
-        logger.info(f"[训练任务] 数据集: {task_data.dataset_path}")
+        logger.info(f"[训练任务] 模型: {model_name}")
+        logger.info(f"[训练任务] 数据集(逻辑名): {dataset_name}，源路径: {task_data.dataset_path}")
         logger.info(f"[训练任务] 输出目录: {output_dir}")
         logger.info(f"[训练任务] 完整命令: {command}")
-        
+
         return command
     
     def get_task(self, db: Session, task_id: str, user_id: str) -> Optional[TaskDB]:

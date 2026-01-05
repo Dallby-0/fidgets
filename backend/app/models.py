@@ -25,12 +25,39 @@ class Token(BaseModel):
 
 # 任务相关模型
 class TaskCreate(BaseModel):
+    """
+    训练任务创建请求模型
+
+    字段与训练命令参数的对应关系：
+    - name:                任务名称（只存数据库，不参与命令）
+    - model_name:          --model_name_or_path
+    - dataset_path:        远程数据集路径（会在训练前被拷贝为 current_dataset.json）
+    - stage:               --stage（默认 sft）
+    - template:            --template（默认 qwen2）
+    - epochs:              --num_train_epochs
+    - learning_rate:       --learning_rate
+    - batch_size:          --per_device_train_batch_size
+    - gradient_accumulation_steps: --gradient_accumulation_steps
+    - fp16:                是否添加 --fp16
+    - output_dir:          --output_dir
+    """
+
     name: str
     model_name: str
     dataset_path: str
-    epochs: Optional[int] = 3
+
+    # 训练阶段和模板
+    stage: Optional[str] = "sft"
+    template: Optional[str] = "qwen2"
+
+    # 训练超参数
+    epochs: Optional[float] = 3.0  # 对应 num_train_epochs
     learning_rate: Optional[float] = 5e-5
-    batch_size: Optional[int] = 4
+    batch_size: Optional[int] = 4  # per_device_train_batch_size
+    gradient_accumulation_steps: Optional[int] = 4
+
+    # 训练配置
+    fp16: Optional[bool] = True
     output_dir: Optional[str] = None
 
 class Task(BaseModel):
