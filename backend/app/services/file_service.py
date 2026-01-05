@@ -1,8 +1,11 @@
+import logging
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.db_models import DatasetFileDB, ModelFileDB
 from app.services.ssh_service import SSHService
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 class FileService:
     def __init__(self):
@@ -17,12 +20,20 @@ class FileService:
         file_size: int
     ) -> DatasetFileDB:
         """上传数据集文件到远程服务器"""
+        logger.info(f"[文件服务] 上传数据集文件，用户: {user_id}, 文件名: {filename}, 大小: {file_size} 字节")
+        
         # 生成远程文件路径
         remote_dir = f"{settings.remote_user_data_dir}/{user_id}/datasets"
         remote_file_path = f"{remote_dir}/{filename}"
+        logger.info(f"[文件服务] 远程文件路径: {remote_file_path}")
         
         # 上传文件
-        self.ssh_service.upload_file(local_file_path, remote_file_path)
+        try:
+            self.ssh_service.upload_file(local_file_path, remote_file_path)
+            logger.info(f"[文件服务] 文件上传成功")
+        except Exception as e:
+            logger.error(f"[文件服务] 文件上传失败: {str(e)}", exc_info=True)
+            raise
         
         # 保存文件信息到数据库
         db_file = DatasetFileDB(
@@ -34,6 +45,7 @@ class FileService:
         db.add(db_file)
         db.commit()
         db.refresh(db_file)
+        logger.info(f"[文件服务] 文件信息已保存到数据库，文件ID: {db_file.file_id}")
         return db_file
     
     def get_user_datasets(self, db: Session, user_id: str) -> List[DatasetFileDB]:

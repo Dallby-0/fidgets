@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -8,6 +9,8 @@ from app.models import TaskCreate, Task
 from app.services.task_service import TaskService
 from app.services.file_service import FileService
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 @router.post("", response_model=Task, status_code=status.HTTP_201_CREATED)
@@ -17,16 +20,23 @@ def create_task(
     db: Session = Depends(get_db)
 ):
     """创建训练任务"""
+    logger.info(f"[API] 创建训练任务，用户: {current_user.user_id}, 任务名: {task_data.name}")
+    
     # 验证数据集文件是否存在（通过路径验证）
     file_service = FileService()
     datasets = file_service.get_user_datasets(db, current_user.user_id)
     dataset_paths = [d.file_path for d in datasets]
+    logger.info(f"[API] 用户数据集路径列表: {dataset_paths}")
+    logger.info(f"[API] 请求的数据集路径: {task_data.dataset_path}")
+    
     if task_data.dataset_path not in dataset_paths:
+        logger.warning(f"[API] 数据集文件不存在: {task_data.dataset_path}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="数据集文件不存在")
     
     task_service = TaskService()
     try:
         db_task = task_service.create_task(db, current_user.user_id, task_data)
+        logger.info(f"[API] 训练任务创建成功，任务ID: {db_task.task_id}")
         return Task(
             task_id=db_task.task_id,
             user_id=db_task.user_id,
@@ -42,6 +52,7 @@ def create_task(
             updated_at=db_task.updated_at
         )
     except Exception as e:
+        logger.error(f"[API] 创建训练任务失败: {str(e)}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("", response_model=List[Task])
