@@ -1,25 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { taskApi, fileApi } from '../services/api';
+import { taskApi, fileApi, AvailableModel } from '../services/api';
 import { TaskCreate } from '../types/task';
 import { DatasetFile } from '../types/file';
 import { useAuth } from '../hooks/useAuth';
 
 export const SubmitTask = () => {
   const [datasets, setDatasets] = useState<DatasetFile[]>([]);
+  const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
   const [taskData, setTaskData] = useState<TaskCreate>({
     name: '',
-    // 默认基础模型名称，建议替换为你实际使用的模型路径
-    model_name: '/root/autodl-tmp/Qwen2-0.5B-Instruct',
+    model_name: '',
     dataset_path: '',
     // 以下默认值与在云端测试成功的命令保持一致
     stage: 'sft',
-    template: 'qwen2',
     epochs: 3.0,
     learning_rate: 5e-5,
     batch_size: 4,
     gradient_accumulation_steps: 4,
-    // output_dir 留空时后端会自动生成用户专属目录，也可以在下面的表单中自定义
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,6 +26,7 @@ export const SubmitTask = () => {
 
   useEffect(() => {
     loadDatasets();
+    loadAvailableModels();
   }, []);
 
   const loadDatasets = async () => {
@@ -36,6 +35,19 @@ export const SubmitTask = () => {
       setDatasets(data);
     } catch (error) {
       console.error('加载数据集失败', error);
+    }
+  };
+
+  const loadAvailableModels = async () => {
+    try {
+      const data = await taskApi.getAvailableModels();
+      setAvailableModels(data);
+      // 如果有模型，默认选择第一个
+      if (data.length > 0) {
+        setTaskData({ ...taskData, model_name: data[0].name });
+      }
+    } catch (error) {
+      console.error('加载模型列表失败', error);
     }
   };
 
@@ -81,14 +93,20 @@ export const SubmitTask = () => {
           />
         </div>
         <div style={{ marginBottom: '15px' }}>
-          <label>模型名称：</label>
-          <input
-            type="text"
+          <label>模型：</label>
+          <select
             value={taskData.model_name}
             onChange={(e) => setTaskData({ ...taskData, model_name: e.target.value })}
             required
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
+          >
+            <option value="">请选择模型</option>
+            {availableModels.map((model) => (
+              <option key={model.name} value={model.name}>
+                {model.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div style={{ marginBottom: '15px' }}>
           <label>数据集：</label>
@@ -112,15 +130,6 @@ export const SubmitTask = () => {
             type="text"
             value={taskData.stage}
             onChange={(e) => setTaskData({ ...taskData, stage: e.target.value })}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>模板（template）：</label>
-          <input
-            type="text"
-            value={taskData.template}
-            onChange={(e) => setTaskData({ ...taskData, template: e.target.value })}
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
           />
         </div>
@@ -163,16 +172,6 @@ export const SubmitTask = () => {
                 gradient_accumulation_steps: parseInt(e.target.value),
               })
             }
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>输出目录（可选）：</label>
-          <input
-            type="text"
-            value={taskData.output_dir || ''}
-            onChange={(e) => setTaskData({ ...taskData, output_dir: e.target.value || undefined })}
-            placeholder="留空则使用默认用户专属目录"
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
           />
         </div>

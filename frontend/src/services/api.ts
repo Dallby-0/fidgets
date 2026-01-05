@@ -32,6 +32,12 @@ api.interceptors.response.use(
   }
 );
 
+export interface AvailableModel {
+  name: string;
+  model_path: string;
+  template: string;
+}
+
 export const taskApi = {
   async createTask(taskData: TaskCreate): Promise<Task> {
     const response = await api.post<Task>('/tasks', taskData);
@@ -50,6 +56,11 @@ export const taskApi = {
 
   async getTaskLogs(taskId: string): Promise<{ logs: string }> {
     const response = await api.get<{ logs: string }>(`/tasks/${taskId}/logs`);
+    return response.data;
+  },
+
+  async getAvailableModels(): Promise<AvailableModel[]> {
+    const response = await api.get<AvailableModel[]>('/tasks/models');
     return response.data;
   },
 };

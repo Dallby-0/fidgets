@@ -13,18 +13,23 @@ class TaskService:
     def __init__(self):
         self.ssh_service = SSHService()
     
-    def create_task(self, db: Session, user_id: str, task_data: TaskCreate) -> TaskDB:
-        """创建任务并启动执行"""
-        # 使用默认模型路径（如果未提供）
-        model_name = task_data.model_name or settings.default_model_path
-        logger.info(f"[训练任务] 使用模型路径: {model_name}")
+    def create_task(self, db: Session, user_id: str, task_data: TaskCreate, model_path: str = None) -> TaskDB:
+        """创建任务并启动执行
         
-        # 生成输出目录
-        if not task_data.output_dir:
-            task_id = str(uuid.uuid4())
-            output_dir = f"{settings.remote_user_data_dir}/{user_id}/models/{task_id}"
-        else:
-            output_dir = task_data.output_dir
+        Args:
+            db: 数据库会话
+            user_id: 用户ID
+            task_data: 任务创建数据（model_name字段存储的是模型名称，不是路径）
+            model_path: 模型路径（用于实际训练命令），如果未提供则使用task_data.model_name作为路径
+        """
+        # 如果提供了model_path，使用它；否则使用task_data.model_name（向后兼容）
+        actual_model_path = model_path or task_data.model_name
+        logger.info(f"[训练任务] 使用模型路径: {actual_model_path}")
+        logger.info(f"[训练任务] 存储的模型名称: {task_data.model_name}")
+        
+        # 生成输出目录（不再使用用户提供的output_dir）
+        task_id = str(uuid.uuid4())
+        output_dir = f"{settings.remote_user_data_dir}/{user_id}/models/{task_id}"
         logger.info(f"[训练任务] 使用输出目录: {output_dir}")
 
         # 在远程服务器上准备当前数据集文件：复制为 current_dataset.json
@@ -55,13 +60,13 @@ class TaskService:
             raise
         
         # 构建训练命令（此时 --dataset 将固定使用 current_dataset）
-        command = self.build_training_command(task_data, output_dir, model_name)
+        command = self.build_training_command(task_data, output_dir, actual_model_path)
         
         # 创建任务记录
         db_task = TaskDB(
             user_id=user_id,
             name=task_data.name,
-            model_name=model_name,  # 使用处理后的模型路径（默认值或用户提供的值）
+            model_name=task_data.model_name,  # 存储模型名称，不是路径
             dataset_path=task_data.dataset_path,
             epochs=task_data.epochs,
             learning_rate=task_data.learning_rate,
