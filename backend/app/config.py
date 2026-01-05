@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # Conda环境名称（如果需要激活conda环境，留空则不激活）
     conda_env: Optional[str] = None
     
+    # DeepSeek API配置
+    deepseek_api_key: Optional[str] = None
+    deepseek_api_url: str = "https://api.deepseek.com/v1/chat/completions"
+    deepseek_model: str = "deepseek-reasoner"
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

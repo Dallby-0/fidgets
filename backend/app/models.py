@@ -119,3 +119,8 @@ class ChatResponse(BaseModel):
     role: str
     content: str
 
+# 数据集生成相关模型
+class DatasetGenerateRequest(BaseModel):
+    topic: str
+    filename: Optional[str] = None  # 可选的文件名，如果不提供则使用话题前10个字符
+

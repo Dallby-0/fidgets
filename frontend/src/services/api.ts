@@ -73,6 +73,14 @@ export const fileApi = {
     await api.delete(`/files/datasets/${fileId}`);
   },
 
+  async generateDataset(topic: string, filename?: string): Promise<DatasetFile> {
+    const response = await api.post<DatasetFile>('/files/datasets/generate', {
+      topic,
+      filename,
+    });
+    return response.data;
+  },
+
   async getModels(): Promise<ModelFile[]> {
     const response = await api.get<ModelFile[]>('/files/models');
     return response.data;

@@ -8,6 +8,10 @@ export const Datasets = () => {
   const [datasets, setDatasets] = useState<DatasetFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [showGenerateForm, setShowGenerateForm] = useState(false);
+  const [topic, setTopic] = useState('');
+  const [filename, setFilename] = useState('');
   const { user, logout } = useAuth();
 
   useEffect(() => {
@@ -51,6 +55,27 @@ export const Datasets = () => {
     }
   };
 
+  const handleGenerateDataset = async () => {
+    if (!topic.trim()) {
+      alert('请输入话题');
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      await fileApi.generateDataset(topic.trim(), filename.trim() || undefined);
+      await loadDatasets();
+      alert('数据集生成成功！');
+      setShowGenerateForm(false);
+      setTopic('');
+      setFilename('');
+    } catch (error: any) {
+      alert('生成失败: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
@@ -72,15 +97,116 @@ export const Datasets = () => {
         <Link to="/models" style={{ marginRight: '10px' }}>模型</Link>
         <Link to="/chat">对话</Link>
       </div>
-      <div style={{ marginBottom: '20px' }}>
-        <input
-          type="file"
-          onChange={handleFileUpload}
-          disabled={uploading}
-          accept=".json,.jsonl"
-        />
-        {uploading && <span>上传中...</span>}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <input
+            type="file"
+            onChange={handleFileUpload}
+            disabled={uploading}
+            accept=".json,.jsonl"
+            style={{ marginRight: '10px' }}
+          />
+          {uploading && <span>上传中...</span>}
+        </div>
+        <div>
+          <button
+            onClick={() => setShowGenerateForm(!showGenerateForm)}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            {showGenerateForm ? '取消生成' : 'AI生成数据集'}
+          </button>
+        </div>
       </div>
+
+      {showGenerateForm && (
+        <div
+          style={{
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            padding: '20px',
+            marginBottom: '20px',
+            backgroundColor: '#f9f9f9',
+          }}
+        >
+          <h3 style={{ marginTop: 0 }}>AI生成数据集</h3>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              话题 <span style={{ color: 'red' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="例如：vibe coding、Python编程、机器学习"
+              disabled={generating}
+              style={{
+                width: '100%',
+                maxWidth: '500px',
+                padding: '8px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px',
+              }}
+            />
+            <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+              输入你想要生成数据集的话题，AI将自动生成30条高质量问答对
+            </div>
+          </div>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              文件名（可选）
+            </label>
+            <input
+              type="text"
+              value={filename}
+              onChange={(e) => setFilename(e.target.value)}
+              placeholder="留空则使用话题前10个字符"
+              disabled={generating}
+              style={{
+                width: '100%',
+                maxWidth: '500px',
+                padding: '8px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px',
+              }}
+            />
+            <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+              如果不指定文件名，将自动使用话题的前10个字符作为文件名
+            </div>
+          </div>
+          <div>
+            <button
+              onClick={handleGenerateDataset}
+              disabled={generating || !topic.trim()}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: generating ? '#ccc' : '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: generating ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+              }}
+            >
+              {generating ? '生成中...' : '开始生成'}
+            </button>
+            {generating && (
+              <span style={{ marginLeft: '10px', color: '#666' }}>
+                正在调用AI生成数据集，请稍候...
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       {loading ? (
         <div>加载中...</div>
       ) : (
