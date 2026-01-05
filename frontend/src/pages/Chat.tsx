@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
 import { fileApi, chatApi } from '../services/api';
 import { ModelFile } from '../types/file';
 import { ChatMessage } from '../types/chat';
-import { useAuth } from '../hooks/useAuth';
+import { Layout } from '../components/Layout';
+import './Chat.css';
 
 export const Chat = () => {
   const [models, setModels] = useState<ModelFile[]>([]);
@@ -11,11 +11,16 @@ export const Chat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const { user, logout } = useAuth();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     loadModels();
   }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
 
   const loadModels = async () => {
     try {
@@ -29,6 +34,10 @@ export const Chat = () => {
     }
   };
 
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const sendMessage = async () => {
     if (!inputMessage.trim() || !selectedModel || loading) return;
 
@@ -37,6 +46,11 @@ export const Chat = () => {
     setMessages(newMessages);
     setInputMessage('');
     setLoading(true);
+
+    // 自动调整文本框高度
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
 
     try {
       const response = await chatApi.completion({
@@ -51,98 +65,117 @@ export const Chat = () => {
     }
   };
 
-  const clearMessages = () => {
-    setMessages([]);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const adjustTextareaHeight = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    e.target.style.height = 'auto';
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h1>对话</h1>
-        <div>
-          <span>欢迎，{user?.username}</span>
-          <button onClick={logout} style={{ marginLeft: '10px' }}>退出</button>
-        </div>
-      </div>
-      <div style={{ marginBottom: '20px' }}>
-        <Link to="/" style={{ marginRight: '10px' }}>任务列表</Link>
-        <Link to="/submit-task" style={{ marginRight: '10px' }}>提交任务</Link>
-        <Link to="/datasets" style={{ marginRight: '10px' }}>数据集</Link>
-        <Link to="/models">模型</Link>
-      </div>
-      <div style={{ marginBottom: '20px' }}>
-        <label>选择模型：</label>
-        <select
-          value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value)}
-          style={{ padding: '5px', minWidth: '300px' }}
-        >
-          {models.map((model) => (
-            <option key={model.model_id} value={model.model_path}>
-              {model.name}
-            </option>
-          ))}
-        </select>
-        <button onClick={clearMessages} style={{ marginLeft: '10px' }}>清空对话</button>
-      </div>
-      <div
-        style={{
-          border: '1px solid #ddd',
-          height: '500px',
-          overflowY: 'auto',
-          padding: '10px',
-          marginBottom: '20px',
-          backgroundColor: '#f9f9f9',
-        }}
-      >
-        {messages.length === 0 && <div>开始对话吧...</div>}
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            style={{
-              marginBottom: '10px',
-              textAlign: msg.role === 'user' ? 'right' : 'left',
-            }}
-          >
-            <div
-              style={{
-                display: 'inline-block',
-                padding: '10px',
-                borderRadius: '5px',
-                backgroundColor: msg.role === 'user' ? '#007bff' : '#e9ecef',
-                color: msg.role === 'user' ? 'white' : 'black',
-                maxWidth: '70%',
-              }}
+    <Layout>
+      <div className="chat-page fade-in">
+        <div className="chat-header">
+          <div>
+            <h1 className="page-title">AI 对话</h1>
+            <p className="text-muted">与 AI 模型进行对话交流</p>
+          </div>
+          <div className="chat-controls">
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="model-select"
+              disabled={loading}
             >
-              {msg.content}
+              {models.map((model) => (
+                <option key={model.model_id} value={model.model_path}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="chat-container card">
+          <div className="messages-area" id="messages-area">
+            {messages.length === 0 ? (
+              <div className="empty-chat">
+                <div className="empty-chat-icon">💬</div>
+                <h3>开始对话</h3>
+                <p className="text-muted">选择模型后，在下方输入消息开始对话</p>
+              </div>
+            ) : (
+              messages.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`message ${msg.role === 'user' ? 'message-user' : 'message-assistant'} slide-in`}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                >
+                  <div className="message-avatar">
+                    {msg.role === 'user' ? '👤' : '🤖'}
+                  </div>
+                  <div className="message-content">
+                    <div className="message-text">{msg.content}</div>
+                  </div>
+                </div>
+              ))
+            )}
+            {loading && (
+              <div className="message message-assistant loading-message">
+                <div className="message-avatar">🤖</div>
+                <div className="message-content">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="chat-input-area">
+            <div className="input-wrapper">
+              <textarea
+                ref={textareaRef}
+                value={inputMessage}
+                onChange={(e) => {
+                  setInputMessage(e.target.value);
+                  adjustTextareaHeight(e);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="输入消息... (Shift + Enter 换行)"
+                className="chat-input"
+                rows={1}
+                disabled={loading || !selectedModel}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={loading || !selectedModel || !inputMessage.trim()}
+                className="btn-primary send-button"
+                title="发送 (Enter)"
+              >
+                {loading ? (
+                  <span className="loading-spinner"></span>
+                ) : (
+                  '📤'
+                )}
+              </button>
+            </div>
+            <div className="input-hint">
+              {!selectedModel && (
+                <span className="text-muted">请先选择一个模型</span>
+              )}
             </div>
           </div>
-        ))}
-        {loading && <div>AI正在思考...</div>}
+        </div>
       </div>
-      <div style={{ display: 'flex' }}>
-        <textarea
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              sendMessage();
-            }
-          }}
-          placeholder="输入消息..."
-          style={{ flex: 1, padding: '10px', minHeight: '80px' }}
-          disabled={loading || !selectedModel}
-        />
-        <button
-          onClick={sendMessage}
-          disabled={loading || !selectedModel || !inputMessage.trim()}
-          style={{ marginLeft: '10px', padding: '10px 20px' }}
-        >
-          发送
-        </button>
-      </div>
-    </div>
+    </Layout>
   );
 };
-

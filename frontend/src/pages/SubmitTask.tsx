@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { taskApi, fileApi, AvailableModel } from '../services/api';
 import { TaskCreate } from '../types/task';
 import { DatasetFile } from '../types/file';
-import { useAuth } from '../hooks/useAuth';
+import { Layout } from '../components/Layout';
+import './SubmitTask.css';
 
 export const SubmitTask = () => {
   const [datasets, setDatasets] = useState<DatasetFile[]>([]);
@@ -12,7 +13,6 @@ export const SubmitTask = () => {
     name: '',
     model_name: '',
     dataset_path: '',
-    // 以下默认值与在云端测试成功的命令保持一致
     stage: 'sft',
     epochs: 3.0,
     learning_rate: 5e-5,
@@ -22,7 +22,6 @@ export const SubmitTask = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
 
   useEffect(() => {
     loadDatasets();
@@ -42,7 +41,6 @@ export const SubmitTask = () => {
     try {
       const data = await taskApi.getAvailableModels();
       setAvailableModels(data);
-      // 如果有模型，默认选择第一个
       if (data.length > 0) {
         setTaskData({ ...taskData, model_name: data[0].name });
       }
@@ -67,120 +65,157 @@ export const SubmitTask = () => {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h1>提交任务</h1>
-        <div>
-          <span>欢迎，{user?.username}</span>
-          <button onClick={logout} style={{ marginLeft: '10px' }}>退出</button>
+    <Layout>
+      <div className="submit-task-page fade-in">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">提交任务</h1>
+            <p className="text-muted">创建新的模型训练任务</p>
+          </div>
+        </div>
+
+        <div className="form-container card">
+          <form onSubmit={handleSubmit} className="task-form">
+            <div className="form-section">
+              <h3 className="section-title">基本信息</h3>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="name">任务名称 <span className="required">*</span></label>
+                  <input
+                    id="name"
+                    type="text"
+                    value={taskData.name}
+                    onChange={(e) => setTaskData({ ...taskData, name: e.target.value })}
+                    required
+                    placeholder="请输入任务名称"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="model_name">模型 <span className="required">*</span></label>
+                  <select
+                    id="model_name"
+                    value={taskData.model_name}
+                    onChange={(e) => setTaskData({ ...taskData, model_name: e.target.value })}
+                    required
+                  >
+                    <option value="">请选择模型</option>
+                    {availableModels.map((model) => (
+                      <option key={model.name} value={model.name}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="dataset_path">数据集 <span className="required">*</span></label>
+                  <select
+                    id="dataset_path"
+                    value={taskData.dataset_path}
+                    onChange={(e) => setTaskData({ ...taskData, dataset_path: e.target.value })}
+                    required
+                  >
+                    <option value="">请选择数据集</option>
+                    {datasets.map((dataset) => (
+                      <option key={dataset.file_id} value={dataset.file_path}>
+                        {dataset.filename}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="stage">训练阶段（stage）</label>
+                  <input
+                    id="stage"
+                    type="text"
+                    value={taskData.stage}
+                    onChange={(e) => setTaskData({ ...taskData, stage: e.target.value })}
+                    placeholder="sft"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="form-section">
+              <h3 className="section-title">训练参数</h3>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="epochs">训练轮数</label>
+                  <input
+                    id="epochs"
+                    type="number"
+                    value={taskData.epochs}
+                    onChange={(e) => setTaskData({ ...taskData, epochs: parseFloat(e.target.value) })}
+                    step="0.1"
+                    min="0.1"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="learning_rate">学习率</label>
+                  <input
+                    id="learning_rate"
+                    type="number"
+                    step="0.00001"
+                    value={taskData.learning_rate}
+                    onChange={(e) => setTaskData({ ...taskData, learning_rate: parseFloat(e.target.value) })}
+                    min="0"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="batch_size">批次大小</label>
+                  <input
+                    id="batch_size"
+                    type="number"
+                    value={taskData.batch_size}
+                    onChange={(e) => setTaskData({ ...taskData, batch_size: parseInt(e.target.value) })}
+                    min="1"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="gradient_accumulation_steps">梯度累积步数</label>
+                  <input
+                    id="gradient_accumulation_steps"
+                    type="number"
+                    value={taskData.gradient_accumulation_steps}
+                    onChange={(e) =>
+                      setTaskData({
+                        ...taskData,
+                        gradient_accumulation_steps: parseInt(e.target.value),
+                      })
+                    }
+                    min="1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <div className="error-message slide-in">
+                {error}
+              </div>
+            )}
+
+            <div className="form-actions">
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="btn-secondary"
+              >
+                取消
+              </button>
+              <button type="submit" disabled={loading} className="btn-primary">
+                {loading ? (
+                  <>
+                    <span className="loading-spinner"></span>
+                    提交中...
+                  </>
+                ) : (
+                  '🚀 提交任务'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-      <div style={{ marginBottom: '20px' }}>
-        <Link to="/" style={{ marginRight: '10px' }}>任务列表</Link>
-        <Link to="/datasets" style={{ marginRight: '10px' }}>数据集</Link>
-        <Link to="/models" style={{ marginRight: '10px' }}>模型</Link>
-        <Link to="/chat">对话</Link>
-      </div>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label>任务名称：</label>
-          <input
-            type="text"
-            value={taskData.name}
-            onChange={(e) => setTaskData({ ...taskData, name: e.target.value })}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>模型：</label>
-          <select
-            value={taskData.model_name}
-            onChange={(e) => setTaskData({ ...taskData, model_name: e.target.value })}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          >
-            <option value="">请选择模型</option>
-            {availableModels.map((model) => (
-              <option key={model.name} value={model.name}>
-                {model.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>数据集：</label>
-          <select
-            value={taskData.dataset_path}
-            onChange={(e) => setTaskData({ ...taskData, dataset_path: e.target.value })}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          >
-            <option value="">请选择数据集</option>
-            {datasets.map((dataset) => (
-              <option key={dataset.file_id} value={dataset.file_path}>
-                {dataset.filename}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>训练阶段（stage）：</label>
-          <input
-            type="text"
-            value={taskData.stage}
-            onChange={(e) => setTaskData({ ...taskData, stage: e.target.value })}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>训练轮数：</label>
-          <input
-            type="number"
-            value={taskData.epochs}
-            onChange={(e) => setTaskData({ ...taskData, epochs: parseFloat(e.target.value) })}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>学习率：</label>
-          <input
-            type="number"
-            step="0.00001"
-            value={taskData.learning_rate}
-            onChange={(e) => setTaskData({ ...taskData, learning_rate: parseFloat(e.target.value) })}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>批次大小：</label>
-          <input
-            type="number"
-            value={taskData.batch_size}
-            onChange={(e) => setTaskData({ ...taskData, batch_size: parseInt(e.target.value) })}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>梯度累积步数（gradient_accumulation_steps）：</label>
-          <input
-            type="number"
-            value={taskData.gradient_accumulation_steps}
-            onChange={(e) =>
-              setTaskData({
-                ...taskData,
-                gradient_accumulation_steps: parseInt(e.target.value),
-              })
-            }
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        {error && <div style={{ color: 'red', marginBottom: '15px' }}>{error}</div>}
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px' }}>
-          {loading ? '提交中...' : '提交任务'}
-        </button>
-      </form>
-    </div>
+    </Layout>
   );
 };
-

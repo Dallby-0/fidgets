@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { fileApi } from '../services/api';
 import { DatasetFile } from '../types/file';
-import { useAuth } from '../hooks/useAuth';
+import { Layout } from '../components/Layout';
+import './Datasets.css';
 
 export const Datasets = () => {
   const [datasets, setDatasets] = useState<DatasetFile[]>([]);
@@ -12,7 +12,6 @@ export const Datasets = () => {
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [topic, setTopic] = useState('');
   const [filename, setFilename] = useState('');
-  const { user, logout } = useAuth();
 
   useEffect(() => {
     loadDatasets();
@@ -83,160 +82,150 @@ export const Datasets = () => {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h1>数据集管理</h1>
-        <div>
-          <span>欢迎，{user?.username}</span>
-          <button onClick={logout} style={{ marginLeft: '10px' }}>退出</button>
+    <Layout>
+      <div className="datasets-page fade-in">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">数据集管理</h1>
+            <p className="text-muted">管理和上传您的训练数据集</p>
+          </div>
         </div>
-      </div>
-      <div style={{ marginBottom: '20px' }}>
-        <Link to="/" style={{ marginRight: '10px' }}>任务列表</Link>
-        <Link to="/submit-task" style={{ marginRight: '10px' }}>提交任务</Link>
-        <Link to="/models" style={{ marginRight: '10px' }}>模型</Link>
-        <Link to="/chat">对话</Link>
-      </div>
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div>
-          <input
-            type="file"
-            onChange={handleFileUpload}
-            disabled={uploading}
-            accept=".json,.jsonl"
-            style={{ marginRight: '10px' }}
-          />
-          {uploading && <span>上传中...</span>}
-        </div>
-        <div>
+
+        <div className="action-bar">
+          <label className="file-upload-label">
+            <input
+              type="file"
+              onChange={handleFileUpload}
+              disabled={uploading}
+              accept=".json,.jsonl"
+              className="file-input"
+            />
+            <span className="btn-secondary">
+              {uploading ? (
+                <>
+                  <span className="loading-spinner"></span>
+                  上传中...
+                </>
+              ) : (
+                <>
+                  📁 上传文件
+                </>
+              )}
+            </span>
+          </label>
           <button
             onClick={() => setShowGenerateForm(!showGenerateForm)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
+            className={`btn-primary ${showGenerateForm ? 'active' : ''}`}
           >
-            {showGenerateForm ? '取消生成' : 'AI生成数据集'}
+            {showGenerateForm ? '✕ 取消生成' : '✨ AI生成数据集'}
           </button>
         </div>
-      </div>
 
-      {showGenerateForm && (
-        <div
-          style={{
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            padding: '20px',
-            marginBottom: '20px',
-            backgroundColor: '#f9f9f9',
-          }}
-        >
-          <h3 style={{ marginTop: 0 }}>AI生成数据集</h3>
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              话题 <span style={{ color: 'red' }}>*</span>
-            </label>
-            <input
-              type="text"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="例如：vibe coding、Python编程、机器学习"
-              disabled={generating}
-              style={{
-                width: '100%',
-                maxWidth: '500px',
-                padding: '8px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '14px',
-              }}
-            />
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-              输入你想要生成数据集的话题，AI将自动生成30条高质量问答对
+        {showGenerateForm && (
+          <div className="generate-form card slide-in">
+            <h3>AI生成数据集</h3>
+            <p className="text-muted form-description">
+              AI将根据您提供的话题自动生成30条高质量的问答对
+            </p>
+            <div className="form-grid">
+              <div className="form-group">
+                <label htmlFor="topic">
+                  话题 <span className="required">*</span>
+                </label>
+                <input
+                  id="topic"
+                  type="text"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="例如：vibe coding、Python编程、机器学习"
+                  disabled={generating}
+                />
+                <small className="form-hint">输入你想要生成数据集的话题</small>
+              </div>
+              <div className="form-group">
+                <label htmlFor="filename">文件名（可选）</label>
+                <input
+                  id="filename"
+                  type="text"
+                  value={filename}
+                  onChange={(e) => setFilename(e.target.value)}
+                  placeholder="留空则使用话题前10个字符"
+                  disabled={generating}
+                />
+                <small className="form-hint">如果不指定文件名，将自动使用话题的前10个字符</small>
+              </div>
+            </div>
+            <div className="form-actions">
+              <button
+                onClick={handleGenerateDataset}
+                disabled={generating || !topic.trim()}
+                className="btn-primary"
+              >
+                {generating ? (
+                  <>
+                    <span className="loading-spinner"></span>
+                    生成中...
+                  </>
+                ) : (
+                  '🚀 开始生成'
+                )}
+              </button>
             </div>
           </div>
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              文件名（可选）
-            </label>
-            <input
-              type="text"
-              value={filename}
-              onChange={(e) => setFilename(e.target.value)}
-              placeholder="留空则使用话题前10个字符"
-              disabled={generating}
-              style={{
-                width: '100%',
-                maxWidth: '500px',
-                padding: '8px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '14px',
-              }}
-            />
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-              如果不指定文件名，将自动使用话题的前10个字符作为文件名
+        )}
+
+        {loading ? (
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p className="text-muted">加载中...</p>
+          </div>
+        ) : datasets.length === 0 ? (
+          <div className="empty-state fade-in">
+            <div className="empty-icon">📊</div>
+            <h3>暂无数据集</h3>
+            <p className="text-muted">上传文件或使用AI生成数据集</p>
+          </div>
+        ) : (
+          <div className="table-container fade-in">
+            <div className="card">
+              <table className="datasets-table">
+                <thead>
+                  <tr>
+                    <th>文件名</th>
+                    <th>大小</th>
+                    <th>上传时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datasets.map((dataset, index) => (
+                    <tr key={dataset.file_id} className="slide-in" style={{ animationDelay: `${index * 50}ms` }}>
+                      <td>
+                        <div className="file-name">
+                          <span className="file-icon">📄</span>
+                          {dataset.filename}
+                        </div>
+                      </td>
+                      <td className="text-muted">{formatSize(dataset.size)}</td>
+                      <td className="text-muted">
+                        {new Date(dataset.created_at).toLocaleString('zh-CN')}
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => handleDelete(dataset.file_id)}
+                          className="btn-danger btn-sm"
+                        >
+                          删除
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-          <div>
-            <button
-              onClick={handleGenerateDataset}
-              disabled={generating || !topic.trim()}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: generating ? '#ccc' : '#2196F3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: generating ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold',
-              }}
-            >
-              {generating ? '生成中...' : '开始生成'}
-            </button>
-            {generating && (
-              <span style={{ marginLeft: '10px', color: '#666' }}>
-                正在调用AI生成数据集，请稍候...
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-      {loading ? (
-        <div>加载中...</div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>文件名</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>大小</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>上传时间</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datasets.map((dataset) => (
-              <tr key={dataset.file_id}>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{dataset.filename}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{formatSize(dataset.size)}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                  {new Date(dataset.created_at).toLocaleString()}
-                </td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                  <button onClick={() => handleDelete(dataset.file_id)}>删除</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {datasets.length === 0 && !loading && <div>暂无数据集</div>}
-    </div>
+        )}
+      </div>
+    </Layout>
   );
 };
-

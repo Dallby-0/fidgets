@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { fileApi } from '../services/api';
 import { ModelFile } from '../types/file';
-import { useAuth } from '../hooks/useAuth';
+import { Layout } from '../components/Layout';
+import './Models.css';
 
 export const Models = () => {
   const [models, setModels] = useState<ModelFile[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, logout } = useAuth();
 
   useEffect(() => {
     loadModels();
@@ -25,48 +24,62 @@ export const Models = () => {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h1>模型管理</h1>
-        <div>
-          <span>欢迎，{user?.username}</span>
-          <button onClick={logout} style={{ marginLeft: '10px' }}>退出</button>
+    <Layout>
+      <div className="models-page fade-in">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">模型管理</h1>
+            <p className="text-muted">查看和管理您的AI模型</p>
+          </div>
         </div>
+
+        {loading ? (
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p className="text-muted">加载中...</p>
+          </div>
+        ) : models.length === 0 ? (
+          <div className="empty-state fade-in">
+            <div className="empty-icon">🤖</div>
+            <h3>暂无模型</h3>
+            <p className="text-muted">当前没有可用的模型</p>
+          </div>
+        ) : (
+          <div className="table-container fade-in">
+            <div className="card">
+              <table className="models-table">
+                <thead>
+                  <tr>
+                    <th>模型名称</th>
+                    <th>模型路径</th>
+                    <th>基础模型</th>
+                    <th>创建时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {models.map((model, index) => (
+                    <tr key={model.model_id} className="slide-in" style={{ animationDelay: `${index * 50}ms` }}>
+                      <td>
+                        <div className="model-name">
+                          <span className="model-icon">🤖</span>
+                          {model.name}
+                        </div>
+                      </td>
+                      <td className="text-muted model-path">{model.model_path}</td>
+                      <td className="text-muted">
+                        {model.base_model_path || <span className="text-tertiary">-</span>}
+                      </td>
+                      <td className="text-muted">
+                        {new Date(model.created_at).toLocaleString('zh-CN')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
-      <div style={{ marginBottom: '20px' }}>
-        <Link to="/" style={{ marginRight: '10px' }}>任务列表</Link>
-        <Link to="/submit-task" style={{ marginRight: '10px' }}>提交任务</Link>
-        <Link to="/datasets" style={{ marginRight: '10px' }}>数据集</Link>
-        <Link to="/chat">对话</Link>
-      </div>
-      {loading ? (
-        <div>加载中...</div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>模型名称</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>模型路径</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>基础模型</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>创建时间</th>
-            </tr>
-          </thead>
-          <tbody>
-            {models.map((model) => (
-              <tr key={model.model_id}>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{model.name}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{model.model_path}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{model.base_model_path || '-'}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                  {new Date(model.created_at).toLocaleString()}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {models.length === 0 && !loading && <div>暂无模型</div>}
-    </div>
+    </Layout>
   );
 };
-

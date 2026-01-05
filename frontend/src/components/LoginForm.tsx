@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/auth';
 import { useAuth } from '../hooks/useAuth';
+import './AuthForm.css';
 
 export const LoginForm = () => {
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
@@ -33,48 +34,73 @@ export const LoginForm = () => {
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '100px auto', padding: '20px' }}>
-      <h2>登录</h2>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label>用户名或邮箱：</label>
-          <input
-            type="text"
-            value={usernameOrEmail}
-            onChange={(e) => setUsernameOrEmail(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
+    <div className="auth-container">
+      <div className="auth-card fade-in">
+        <div className="auth-header">
+          <h2>欢迎回来</h2>
+          <p className="text-muted">登录您的账户以继续</p>
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>密码：</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <div className="form-group">
+            <label htmlFor="usernameOrEmail">用户名或邮箱</label>
             <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
+              id="usernameOrEmail"
+              type="text"
+              value={usernameOrEmail}
+              onChange={(e) => setUsernameOrEmail(e.target.value)}
+              required
+              placeholder="请输入用户名或邮箱"
+              disabled={loading}
             />
-            记住我
-          </label>
+          </div>
+          <div className="form-group">
+            <label htmlFor="password">密码</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="请输入密码"
+              disabled={loading}
+            />
+          </div>
+          <div className="form-group checkbox-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={loading}
+              />
+              <span>记住我</span>
+            </label>
+          </div>
+          {error && (
+            <div className="error-message slide-in">
+              {error}
+            </div>
+          )}
+          <button type="submit" disabled={loading} className="btn-primary btn-full">
+            {loading ? (
+              <>
+                <span className="loading-spinner"></span>
+                登录中...
+              </>
+            ) : (
+              '登录'
+            )}
+          </button>
+        </form>
+        <div className="auth-footer">
+          <p className="text-muted">
+            还没有账户？{' '}
+            <Link to="/register" className="auth-link">
+              立即注册
+            </Link>
+          </p>
         </div>
-        {error && <div style={{ color: 'red', marginBottom: '15px' }}>{error}</div>}
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px' }}>
-          {loading ? '登录中...' : '登录'}
-        </button>
-      </form>
-      <div style={{ marginTop: '15px', textAlign: 'center' }}>
-        <Link to="/register">还没有账户？注册</Link>
       </div>
     </div>
   );
 };
-
