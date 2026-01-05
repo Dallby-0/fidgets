@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     # 对话推理配置
     chat_script_path: str
     chat_timeout: int = 300
+    # 使用交互式CLI还是Python脚本（"cli" 或 "script"）
+    chat_mode: str = "cli"
+    # LlamaFactory CLI路径（如果使用cli模式）
+    llamafactory_cli_path: str = "llamafactory-cli"
+    # Conda环境名称（如果需要激活conda环境，留空则不激活）
+    conda_env: Optional[str] = None
     
     class Config:
         env_file = ".env"
